@@ -1,5 +1,5 @@
 package com.tuapp.grocery_backend.model;
-
+import com.tuapp.grocery_backend.model.Producto;
 import jakarta.persistence.*;
 
 @Entity

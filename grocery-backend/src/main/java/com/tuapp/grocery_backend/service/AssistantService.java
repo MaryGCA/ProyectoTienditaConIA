@@ -19,7 +19,13 @@ public class AssistantService {
     @Autowired
     private CarritoService carritoService;
 
+    // =========================
+    // Guardar el producto pendiente para agregar
+    // =========================
+    private Producto productoPendiente = null;
+
     public String chat(String message) {
+
         if (message == null || message.isBlank()) {
             return "¿Podrías escribir tu consulta nuevamente? 😊";
         }
@@ -34,138 +40,256 @@ public class AssistantService {
 
         // ===== LIMPIAR PALABRAS IRRELEVANTES =====
         String[] stopWords = {"quiero", "dame", "agrega", "al", "carrito", "por favor", "vendeme"};
-        for (String w : stopWords) msg = msg.replace(w, "").trim();
+        for (String w : stopWords) {
+            msg = msg.replace(w, "").trim();
+        }
 
         // ===== CONSULTA DE VARIEDADES =====
         if (msg.matches(".*\\b(tipo|variedad|qué tipo)\\b.*")) {
+
             for (Producto p : productos) {
+
                 if (msg.contains(p.getNombre().toLowerCase())) {
-                    List<Producto> encontrados = productoRepository.findByNombreContainingIgnoreCase(p.getNombre());
+
+                    List<Producto> encontrados =
+                            productoRepository.findByNombreContainingIgnoreCase(p.getNombre());
+
                     if (encontrados == null || encontrados.isEmpty()) {
-                        return "No encontré variedades disponibles de " + capitalize(p.getNombre()) + ".";
+                        return "No encontré variedades disponibles de " +
+                                capitalize(p.getNombre()) + ".";
                     }
 
-                    StringBuilder resVariedades = new StringBuilder();
-                    resVariedades.append("Tenemos las siguientes variedades de ")
-                                 .append(capitalize(p.getNombre()))
-                                 .append(":\n");
+                    StringBuilder res = new StringBuilder();
+                    res.append("Tenemos las siguientes variedades de ")
+                       .append(capitalize(p.getNombre()))
+                       .append(":\n");
 
                     for (Producto prod : encontrados) {
-                        resVariedades.append("- ")
-                                     .append(prod.getVariedad() != null ? prod.getVariedad() : "Sin variedad")
-                                     .append(" ($")
-                                     .append(prod.getPrecio())
-                                     .append(")\n");
+                        res.append("- ")
+                           .append(prod.getVariedad() != null ?
+                                   prod.getVariedad() : "Sin variedad")
+                           .append(" ($")
+                           .append(prod.getPrecio())
+                           .append(")\n");
                     }
 
-                    return resVariedades.toString();
+                    return res.toString();
                 }
             }
+
             return "No encontré el producto solicitado para consultar variedades.";
         }
 
-        // ===== DETECCIÓN DE PRODUCTO PARA ESPERAR INSTRUCCIÓN =====
-        for (Producto p : productos) {
-            String nombreLower = p.getNombre().toLowerCase();
-            String variedadLower = p.getVariedad() != null ? p.getVariedad().toLowerCase() : "";
+        // ===== SI HAY PRODUCTO PENDIENTE =====
+        if (productoPendiente != null) {
 
-            if (msg.contains(nombreLower) || (!variedadLower.isEmpty() && msg.contains(variedadLower))) {
-                // Solo confirma que el producto existe, no agrega automáticamente
-                String displayName = p.getVariedad() != null ? p.getVariedad() : capitalize(p.getNombre());
-                return "Encontré " + displayName + ". Por favor, indica la cantidad que deseas agregar al carrito.";
+            double cantidad = detectarCantidadNumero(msg);
+
+            if (cantidad > 0) {
+
+                String displayName =
+                        productoPendiente.getVariedad() != null
+                                ? productoPendiente.getVariedad()
+                                : capitalize(productoPendiente.getNombre());
+
+                String resultado =
+                        agregarAlCarrito(productoPendiente, cantidad, displayName);
+
+                productoPendiente = null;
+                return resultado;
+
+            } else {
+                return "Por favor, indica la cantidad que deseas agregar al carrito para "
+                        + (productoPendiente.getVariedad() != null
+                        ? productoPendiente.getVariedad()
+                        : capitalize(productoPendiente.getNombre()))
+                        + ".";
             }
         }
 
-        // ===== PEDIDO CON CANTIDAD EXPLÍCITA =====
-        String[] partes = msg.split(",| y ");
-        StringBuilder respuesta = new StringBuilder();
+        // ==================================================
+// ===== DETECCIÓN DE LISTA (CORREGIDA) ============
+// ==================================================
+if (msg.contains(",")) {
 
-        for (String parte : partes) {
-            parte = parte.trim();
-            if (parte.isEmpty()) continue;
+    String[] partes = msg.split(",");
+    StringBuilder respuestaFinal = new StringBuilder();
+    boolean agregado = false;
 
-            double cantidad = detectarCantidadNumero(parte); // Soporta fracciones y kilos
-            boolean agregado = false;
+    for (String parte : partes) {
 
+        String fragmento = parte.trim();
+        double cantidad = detectarCantidadNumero(fragmento);
+
+        if (cantidad <= 0) continue;
+
+        Producto productoEncontrado = null;
+
+        // 1️⃣ PRIORIDAD: COINCIDENCIA EXACTA POR VARIEDAD
+        for (Producto p : productos) {
+            if (p.getVariedad() != null &&
+                fragmento.contains(p.getVariedad().toLowerCase())) {
+
+                productoEncontrado = p;
+                break;
+            }
+        }
+
+        // 2️⃣ SI NO ENCONTRÓ POR VARIEDAD, BUSCAR POR NOMBRE BASE
+        if (productoEncontrado == null) {
             for (Producto p : productos) {
-                String nombreLower = p.getNombre().toLowerCase();
-                String variedadLower = p.getVariedad() != null ? p.getVariedad().toLowerCase() : "";
-
-                if (parte.contains(nombreLower) || (!variedadLower.isEmpty() && parte.contains(variedadLower))) {
-                    String displayName = p.getVariedad() != null ? p.getVariedad() : capitalize(p.getNombre());
-                    respuesta.append(agregarAlCarrito(p, cantidad, displayName)).append("\n");
-                    agregado = true;
+                if (fragmento.contains(p.getNombre().toLowerCase())) {
+                    productoEncontrado = p;
                     break;
                 }
             }
+        }
 
-            if (!agregado) {
-                respuesta.append("No encontré el producto: ").append(parte).append("\n");
+        if (productoEncontrado != null) {
+
+            String displayName =
+                    productoEncontrado.getVariedad() != null
+                            ? productoEncontrado.getVariedad()
+                            : capitalize(productoEncontrado.getNombre());
+
+            respuestaFinal.append(
+                    agregarAlCarrito(productoEncontrado, cantidad, displayName)
+            ).append(" ");
+
+            agregado = true;
+        }
+    }
+
+    if (agregado) {
+        return respuestaFinal.toString();
+    }
+}
+        // ==================================================
+        // ===== DETECCIÓN DE PRODUCTO INDIVIDUAL ==========
+        // ==================================================
+        for (Producto p : productos) {
+
+            String nombreLower = p.getNombre().toLowerCase();
+            String variedadLower =
+                    p.getVariedad() != null
+                            ? p.getVariedad().toLowerCase()
+                            : "";
+
+            if (msg.contains(nombreLower) ||
+               (!variedadLower.isEmpty() &&
+                msg.contains(variedadLower))) {
+
+                double cantidad = detectarCantidadNumero(msg);
+
+                if (cantidad > 0) {
+
+                    String displayName =
+                            p.getVariedad() != null
+                                    ? p.getVariedad()
+                                    : capitalize(p.getNombre());
+
+                    return agregarAlCarrito(p, cantidad, displayName);
+                }
+
+                productoPendiente = p;
+
+                return "Encontré "
+                        + (p.getVariedad() != null
+                        ? p.getVariedad()
+                        : capitalize(p.getNombre()))
+                        + ". Por favor, indica la cantidad que deseas agregar al carrito.";
             }
         }
 
-        if (respuesta.length() > 0) return respuesta.toString().trim();
-
-        // ===== RESPUESTAS FALLO ALEATORIAS =====
+        // ===== RESPUESTAS FALLBACK =====
         String[] respuestasFallback = {
-            "Hmm 🤔 no estoy seguro, ¿puedes reformularlo?",
-            "No entendí eso, pero podemos intentarlo de nuevo 😊",
-            "¡Ups! Creo que eso no es un producto válido, intenta otra vez 🛒"
+                "Hmm 🤔 no estoy seguro, ¿puedes reformularlo?",
+                "No entendí eso, pero podemos intentarlo de nuevo 😊",
+                "¡Ups! Creo que eso no es un producto válido, intenta otra vez 🛒"
         };
-        return respuestasFallback[new Random().nextInt(respuestasFallback.length)];
+
+        return respuestasFallback[
+                new Random().nextInt(respuestasFallback.length)
+        ];
     }
 
     // =========================
-    // MÉTODO AUXILIAR PARA AGREGAR AL CARRITO
+    // AGREGAR AL CARRITO
     // =========================
     private String agregarAlCarrito(Producto p, double cantidad, String displayName) {
-        int cantidadEntera = (int) Math.ceil(cantidad); // Convertir a entero para el carrito
+
+        int cantidadEntera = (int) Math.ceil(cantidad);
+
         if (p.getStock() == null || p.getStock() < cantidadEntera) {
+
             if (p.getStock() != null && p.getStock() > 0) {
                 carritoService.agregar(p, p.getStock());
-                return "Solo quedan " + p.getStock() + " unidad(es) de " + displayName + ", las agregué al carrito 📦";
+                return "Solo quedan " + p.getStock()
+                        + " unidad(es) de " + displayName
+                        + ", las agregué al carrito 📦";
             }
+
             return "No hay suficiente stock de " + displayName + " 📦";
         }
 
         carritoService.agregar(p, cantidadEntera);
-        return "Perfecto 🙌 Agregué " + cantidad + " unidad(es)/kilo(s) de " + displayName + " al carrito.";
+
+        return "Perfecto 🙌 Agregué "
+                + cantidad
+                + " unidad(es)/kilo(s) de "
+                + displayName
+                + " al carrito.";
     }
 
     // =========================
-    // DETECTAR CANTIDAD (soporta fracciones y kilos)
+    // DETECTAR CANTIDAD
     // =========================
     private double detectarCantidadNumero(String msg) {
+
         msg = msg.toLowerCase();
 
-        // Fracciones y palabras
-        if (msg.contains("medio kilo") || msg.contains("1/2 kilo") || msg.contains("1/2k")) return 0.5;
-        if (msg.contains("cuarto de kilo") || msg.contains("1/4 kilo") || msg.contains("1/4k")) return 0.25;
+        if (msg.contains("medio kilo") ||
+            msg.contains("1/2 kilo") ||
+            msg.contains("1/2k")) return 0.5;
 
-        // Números seguidos de "kilo", "kg" o "k"
-        Pattern patternKilo = Pattern.compile("(\\d+(\\.\\d+)?)\\s*(kilo|kg|k)");
+        if (msg.contains("cuarto de kilo") ||
+            msg.contains("1/4 kilo") ||
+            msg.contains("1/4k")) return 0.25;
+
+        Pattern patternKilo =
+                Pattern.compile("(\\d+(\\.\\d+)?)\\s*(kilo|kg|k)");
         Matcher matcherKilo = patternKilo.matcher(msg);
+
         if (matcherKilo.find()) {
-            try { return Double.parseDouble(matcherKilo.group(1)); } 
-            catch (NumberFormatException e) { return 1; }
+            try {
+                return Double.parseDouble(matcherKilo.group(1));
+            } catch (NumberFormatException e) {
+                return 1;
+            }
         }
 
-        // Si solo hay número
         Pattern patternNum = Pattern.compile("(\\d+)");
         Matcher matcherNum = patternNum.matcher(msg);
+
         if (matcherNum.find()) {
-            try { return Double.parseDouble(matcherNum.group(1)); } 
-            catch (NumberFormatException e) { return 1; }
+            try {
+                return Double.parseDouble(matcherNum.group(1));
+            } catch (NumberFormatException e) {
+                return 1;
+            }
         }
 
-        return 1;
+        return 0;
     }
 
     // =========================
-    // Capitalizar la primera letra
+    // CAPITALIZAR
     // =========================
     private String capitalize(String str) {
+
         if (str == null || str.isEmpty()) return str;
-        return str.substring(0,1).toUpperCase() + str.substring(1);
+
+        return str.substring(0, 1).toUpperCase()
+                + str.substring(1);
     }
 }

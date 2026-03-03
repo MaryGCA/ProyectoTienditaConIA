@@ -1,11 +1,12 @@
-com/tuapp/grocery_backend/controller/CarritoController.class
 com/tuapp/grocery_backend/dto/ChatResponse.class
-com/tuapp/grocery_backend/service/AssistantService.class
 com/tuapp/grocery_backend/dto/ChatRequest.class
-com/tuapp/grocery_backend/repository/ProductoRepository.class
-com/tuapp/grocery_backend/service/CarritoService.class
 com/tuapp/grocery_backend/tools/ProductoTool.class
-com/tuapp/grocery_backend/controller/ChatController.class
 com/tuapp/grocery_backend/GroceryBackendApplication.class
+com/tuapp/grocery_backend/controller/CarritoController.class
+com/tuapp/grocery_backend/service/AssistantService.class
+com/tuapp/grocery_backend/repository/ProductoRepository.class
+com/tuapp/grocery_backend/controller/ProductoController.class
+com/tuapp/grocery_backend/service/CarritoService.class
+com/tuapp/grocery_backend/controller/ChatController.class
 com/tuapp/grocery_backend/model/Producto.class
 com/tuapp/grocery_backend/tools/CarritoTool.class
