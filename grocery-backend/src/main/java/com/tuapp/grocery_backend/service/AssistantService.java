@@ -108,65 +108,62 @@ public class AssistantService {
         }
 
         // ==================================================
-// ===== DETECCIÓN DE LISTA (CORREGIDA) ============
-// ==================================================
-if (msg.contains(",")) {
+        // ===== DETECCIÓN DE LISTA (CORREGIDA) ============
+        // ==================================================
+        if (msg.contains(",")) {
 
-    String[] partes = msg.split(",");
-    StringBuilder respuestaFinal = new StringBuilder();
-    boolean agregado = false;
+            String[] partes = msg.split(",");
+            StringBuilder respuestaFinal = new StringBuilder();
+            boolean agregado = false;
 
-    for (String parte : partes) {
+            for (String parte : partes) {
 
-        String fragmento = parte.trim();
-        double cantidad = detectarCantidadNumero(fragmento);
+                String fragmento = parte.trim();
+                double cantidad = detectarCantidadNumero(fragmento);
 
-        if (cantidad <= 0) continue;
+                if (cantidad <= 0) continue;
 
-        Producto productoEncontrado = null;
+                Producto productoEncontrado = null;
 
-        // 1️⃣ PRIORIDAD: COINCIDENCIA EXACTA POR VARIEDAD
-        for (Producto p : productos) {
-            if (p.getVariedad() != null &&
-                fragmento.contains(p.getVariedad().toLowerCase())) {
+                for (Producto p : productos) {
+                    if (p.getVariedad() != null &&
+                        fragmento.contains(p.getVariedad().toLowerCase())) {
 
-                productoEncontrado = p;
-                break;
-            }
-        }
+                        productoEncontrado = p;
+                        break;
+                    }
+                }
 
-        // 2️⃣ SI NO ENCONTRÓ POR VARIEDAD, BUSCAR POR NOMBRE BASE
-        if (productoEncontrado == null) {
-            for (Producto p : productos) {
-                if (fragmento.contains(p.getNombre().toLowerCase())) {
-                    productoEncontrado = p;
-                    break;
+                if (productoEncontrado == null) {
+                    for (Producto p : productos) {
+                        if (fragmento.contains(p.getNombre().toLowerCase())) {
+                            productoEncontrado = p;
+                            break;
+                        }
+                    }
+                }
+
+                if (productoEncontrado != null) {
+
+                    String displayName =
+                            productoEncontrado.getVariedad() != null
+                                    ? productoEncontrado.getVariedad()
+                                    : capitalize(productoEncontrado.getNombre());
+
+                    respuestaFinal.append(
+                            agregarAlCarrito(productoEncontrado, cantidad, displayName)
+                    ).append(" ");
+
+                    agregado = true;
                 }
             }
+
+            if (agregado) {
+                return respuestaFinal.toString();
+            }
         }
 
-        if (productoEncontrado != null) {
-
-            String displayName =
-                    productoEncontrado.getVariedad() != null
-                            ? productoEncontrado.getVariedad()
-                            : capitalize(productoEncontrado.getNombre());
-
-            respuestaFinal.append(
-                    agregarAlCarrito(productoEncontrado, cantidad, displayName)
-            ).append(" ");
-
-            agregado = true;
-        }
-    }
-
-    if (agregado) {
-        return respuestaFinal.toString();
-    }
-}
-        // ==================================================
         // ===== DETECCIÓN DE PRODUCTO INDIVIDUAL ==========
-        // ==================================================
         for (Producto p : productos) {
 
             String nombreLower = p.getNombre().toLowerCase();
@@ -201,16 +198,43 @@ if (msg.contains(",")) {
             }
         }
 
-        // ===== RESPUESTAS FALLBACK =====
+        // ===== VERIFICAR SI EL USUARIO INTENTA BUSCAR UN PRODUCTO =====
+
+        boolean pareceProducto = msg.length() > 2 && !msg.matches(".*\\b(hola|hi|hey|gracias|ok)\\b.*");
+
+        if (pareceErrorEscritura(msg)) {
+            return "No logré entender lo que escribiste 🤔 ¿Podrías corregirlo o escribirlo nuevamente?";
+        }
+
+        if (pareceProducto) {
+            return "Lo siento 😕, ese producto no está en nuestra base de datos.";
+        }
+
         String[] respuestasFallback = {
                 "Hmm 🤔 no estoy seguro, ¿puedes reformularlo?",
                 "No entendí eso, pero podemos intentarlo de nuevo 😊",
-                "¡Ups! Creo que eso no es un producto válido, intenta otra vez 🛒"
+                "No estoy seguro de lo que buscas 🤔"
         };
 
         return respuestasFallback[
                 new Random().nextInt(respuestasFallback.length)
         ];
+    }
+
+    // =========================
+    // DETECTAR ERROR DE ESCRITURA
+    // =========================
+    private boolean pareceErrorEscritura(String msg) {
+
+        if (msg.matches(".*[bcdfghjklmnpqrstvwxyz]{5,}.*")) {
+            return true;
+        }
+
+        if (!msg.matches("[a-záéíóúñ0-9\\s?]+")) {
+            return true;
+        }
+
+        return false;
     }
 
     // =========================
