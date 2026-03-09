@@ -26,11 +26,12 @@ public class CarritoService {
         productoRepository.save(producto);
 
         Map<String, Object> item = new HashMap<>();
+        item.put("id", producto.getId()); // 👈 SOLO ESTA LINEA NUEVA
         item.put("nombre", producto.getNombre());
         item.put("precio", producto.getPrecio());
         item.put("cantidad", cantidad);
         item.put("subtotal", producto.getPrecio() * cantidad);
-
+        
         carrito.add(item);
     }
 
@@ -46,5 +47,8 @@ public class CarritoService {
 
     public void vaciarCarrito() {
         carrito.clear();
+    }
+    public void eliminarProducto(Long id) {
+    carrito.removeIf(item -> item.get("id").equals(id));
     }
 }

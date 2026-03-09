@@ -10,7 +10,10 @@ import com.tuapp.grocery_backend.repository.ProductoRepository;
 @RestController
 @RequestMapping("/api/productos")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:8080")
+@CrossOrigin(origins = {
+        "http://localhost:8080", // frontend Vue (carrito)
+        "http://localhost:8081"  // agente
+})
 public class ProductoController {
 
     private final ProductoRepository productoRepository;
